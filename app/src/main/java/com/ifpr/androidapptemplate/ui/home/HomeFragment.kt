@@ -2,90 +2,91 @@ package com.ifpr.androidapptemplate.ui.home
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
-import android.widget.TextView
-import androidx.fragment.app.Fragment
-import android.util.Base64
 import android.widget.*
 import android.graphics.BitmapFactory
 import android.location.Geocoder
 import android.location.Location
 import android.os.Looper
+import androidx.fragment.app.Fragment
 import androidx.core.app.ActivityCompat
-import androidx.appcompat.app.AppCompatDelegate
-import androidx.appcompat.widget.SwitchCompat
 import com.bumptech.glide.Glide
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
+import com.google.android.gms.location.*
 import com.google.android.material.snackbar.Snackbar
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.google.firebase.database.*
+import kotlinx.coroutines.*
 import java.util.Locale
+import android.content.Intent
+import android.net.Uri
+
 import com.ifpr.androidapptemplate.R
 import com.ifpr.androidapptemplate.baseclasses.Item
-import com.ifpr.androidapptemplate.databinding.FragmentHomeBinding
 
 class HomeFragment : Fragment() {
-
-    private var _binding: FragmentHomeBinding? = null
 
     private lateinit var currentAddressTextView: TextView
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
     private lateinit var locationRequest: LocationRequest
 
+    private var currentLatitude: Double? = null
+    private var currentLongitude: Double? = null
+
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1
     }
-
-    // This property is only valid between onCreateView and
-    // onDestroyView.
-    private val binding get() = _binding!!
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+
         val view = inflater.inflate(R.layout.fragment_home, container, false)
+
+        currentAddressTextView = view.findViewById(R.id.currentAddressTextView)
+        val btnAbrirMapa = view.findViewById<Button>(R.id.btnAbrirMapa)
+
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
+
+        btnAbrirMapa.setOnClickListener {
+            if (currentLatitude != null && currentLongitude != null) {
+                abrirNoGoogleMaps(currentLatitude!!, currentLongitude!!)
+            } else {
+                Toast.makeText(requireContext(), "Localização ainda não disponível", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         inicializaGerenciamentoLocalizacao(view)
 
-        val container = view.findViewById<LinearLayout>(R.id.itemContainer)
-        carregarItensMarketplace(container)
+        val containerLayout = view.findViewById<LinearLayout>(R.id.itemContainer)
+        carregarItensMarketplace(containerLayout)
 
         return view
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
+    private fun abrirNoGoogleMaps(latitude: Double, longitude: Double) {
+        val uri = "geo:$latitude,$longitude?q=$latitude,$longitude(Localização atual)"
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri))
+        intent.setPackage("com.google.android.apps.maps")
+
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(requireContext(), "Google Maps não encontrado", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun inicializaGerenciamentoLocalizacao(view: View) {
-        currentAddressTextView = view.findViewById(R.id.currentAddressTextView)
-
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
 
         if (ActivityCompat.checkSelfPermission(
                 requireContext(),
                 Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+            ) != PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(
                 requireContext(),
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
@@ -112,13 +113,14 @@ class HomeFragment : Fragment() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 getCurrentLocation()
             } else {
                 Snackbar.make(
                     requireView(),
-                    "Permission denied. Cannot access location.",
+                    "Permissão negada para localização",
                     Snackbar.LENGTH_LONG
                 ).show()
             }
@@ -126,10 +128,12 @@ class HomeFragment : Fragment() {
     }
 
     private fun getCurrentLocation() {
+
         if (ActivityCompat.checkSelfPermission(
                 requireContext(),
                 Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+            ) != PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(
                 requireContext(),
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
@@ -146,10 +150,9 @@ class HomeFragment : Fragment() {
         }
 
         locationRequest = LocationRequest.create().apply {
-            interval = 30000 // Intervalo em milissegundos para atualizacoes de localizacao
-            fastestInterval =
-                30000 // O menor intervalo de tempo para receber atualizacoes de localizacao
-            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+            interval = 30000
+            fastestInterval = 30000
+            priority = Priority.PRIORITY_HIGH_ACCURACY
         }
 
         fusedLocationClient.requestLocationUpdates(
@@ -160,32 +163,45 @@ class HomeFragment : Fragment() {
     }
 
     private fun displayAddress(location: Location) {
+
+        val latitude = location.latitude
+        val longitude = location.longitude
+
+        currentLatitude = latitude
+        currentLongitude = longitude
+
         val geocoder = Geocoder(requireContext(), Locale.getDefault())
-        val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
+        val addresses = geocoder.getFromLocation(latitude, longitude, 1)
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val address = addresses?.firstOrNull()?.getAddressLine(0) ?: "Address not found"
+                val address = addresses?.firstOrNull()?.getAddressLine(0)
+                    ?: "Endereço não encontrado"
+
                 withContext(Dispatchers.Main) {
                     currentAddressTextView.text = address
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    currentAddressTextView.text = "Error: ${e.message}"
+                    currentAddressTextView.text = "Erro: ${e.message}"
                 }
             }
         }
     }
 
     fun carregarItensMarketplace(container: LinearLayout) {
+
         val databaseRef = FirebaseDatabase.getInstance().getReference("metas")
 
         databaseRef.addListenerForSingleValueEvent(object : ValueEventListener {
+
             override fun onDataChange(snapshot: DataSnapshot) {
+
                 container.removeAllViews()
 
                 for (userSnapshot in snapshot.children) {
                     for (itemSnapshot in userSnapshot.children) {
+
                         val item = itemSnapshot.getValue(Item::class.java) ?: continue
 
                         val itemView = LayoutInflater.from(container.context)
@@ -212,7 +228,7 @@ class HomeFragment : Fragment() {
                             Glide.with(container.context).load(item.imageUrl).into(imageView)
                         } else if (!item.base64Image.isNullOrEmpty()) {
                             try {
-                                val bytes = Base64.decode(item.base64Image, Base64.DEFAULT)
+                                val bytes = android.util.Base64.decode(item.base64Image, android.util.Base64.DEFAULT)
                                 val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                                 imageView.setImageBitmap(bitmap)
                             } catch (_: Exception) {}
