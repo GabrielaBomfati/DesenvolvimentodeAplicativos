@@ -97,9 +97,6 @@ if [ -n "$JAVA_HOME" ] ; then
 Please set the JAVA_HOME variable in your environment to match the
 location of your Java installation."
     fi
-else
-    JAVACMD="java"
-    which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
 
 Please set the JAVA_HOME variable in your environment to match the
 location of your Java installation."
@@ -151,25 +148,13 @@ if [ "$cygwin" = "true" -o "$msys" = "true" ] ; then
         CHECK=`echo "$arg"|egrep -c "$OURCYGPATTERN" -`
         CHECK2=`echo "$arg"|egrep -c "^-"`                                 ### Determine if an option
 
-        if [ $CHECK -ne 0 ] && [ $CHECK2 -eq 0 ] ; then                    ### Added a condition
-            eval `echo args$i`=`cygpath --path --ignore --mixed "$arg"`
+       
         else
             eval `echo args$i`="\"$arg\""
         fi
         i=`expr $i + 1`
     done
-    case $i in
-        0) set -- ;;
-        1) set -- "$args0" ;;
-        2) set -- "$args0" "$args1" ;;
-        3) set -- "$args0" "$args1" "$args2" ;;
-        4) set -- "$args0" "$args1" "$args2" "$args3" ;;
-        5) set -- "$args0" "$args1" "$args2" "$args3" "$args4" ;;
-        6) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" ;;
-        7) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" "$args6" ;;
-        8) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" "$args6" "$args7" ;;
-        9) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" "$args6" "$args7" "$args8" ;;
-    esac
+   
 fi
 
 # Escape application args
