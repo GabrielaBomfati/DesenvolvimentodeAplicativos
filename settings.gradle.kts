@@ -8,7 +8,7 @@ pluginManagement {
             }
         }
         mavenCentral()
-        gradlePluginPortal()
+        gradlePluginPortal(
     }
 }
 dependencyResolutionManagement {
@@ -20,5 +20,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Android App Template"
-include(":app")
+include(":app"
  
